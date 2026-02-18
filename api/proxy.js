@@ -1,18 +1,31 @@
-export default async function handler(req, res) {
-  const target = req.query.url;
-  if (!target) return res.status(400).json({ error: "Missing ?url=" });
-  if (!/^https?:\/\//i.test(target)) return res.status(400).json({ error: "Invalid url" });
+module.exports = async (req, res) => {
+  try {
+    const target = req.query && req.query.url;
 
-  const r = await fetch(target, {
-    headers: { "user-agent": "Mozilla/5.0" },
-  });
+    if (!target) {
+      res.statusCode = 400;
+      return res.json({ error: "Missing ?url=" });
+    }
 
-  res.status(r.status);
-  res.setHeader(
-    "content-type",
-    r.headers.get("content-type") || "application/json"
-  );
+    if (!/^https?:\/\//i.test(target)) {
+      res.statusCode = 400;
+      return res.json({ error: "Invalid url" });
+    }
 
-  const buf = Buffer.from(await r.arrayBuffer());
-  res.send(buf);
-}
+    const upstream = await fetch(target, {
+      headers: { "user-agent": "Mozilla/5.0" },
+    });
+
+    res.statusCode = upstream.status;
+    res.setHeader(
+      "content-type",
+      upstream.headers.get("content-type") || "application/json"
+    );
+
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    return res.end(buf);
+  } catch (e) {
+    res.statusCode = 500;
+    return res.json({ error: "Proxy failed", details: String(e?.message || e) });
+  }
+};
